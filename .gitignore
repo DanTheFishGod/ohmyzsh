@@ -1,6 +1,10 @@
 # custom files
 custom/
 
+# Custom plugins
+plugins/tftd
+
+
 # temp files directories
 cache/
 log/
