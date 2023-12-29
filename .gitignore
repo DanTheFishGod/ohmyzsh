@@ -3,11 +3,7 @@ custom/
 
 # Custom plugins
 plugins/thoughtfortheday
-<<<<<<< HEAD
 plugins/tftd
-=======
->>>>>>> 7237d4d (Update git ignore)
-
 
 # temp files directories
 cache/
