@@ -2,9 +2,10 @@
 # and optionally push the rewritten branch tips to your fork via origin.
 #
 # Safe usage:
-#   omz-customupdate             # updates upstream/master -> local master, rebases custom, and pushes origin/master + origin/custom
-#   omz-customupdate --fork-only # fetches remote fork state and aligns local master/custom to origin without pushing
-#   omz-customupdate --help      # shows usage
+#   omz-customupdate             # upstream -> master -> custom; push origin/master + origin/custom
+#   omz-customupdate --fork-only # align local master/custom to origin without pushing
+#   omz-customupdate --client    # read-only client: sync local custom to origin/custom without pushing
+#   omz-customupdate --help      # show usage
 
 omz-customupdate() {
   local mode="sync"
@@ -14,11 +15,15 @@ omz-customupdate() {
     --fork-only|-f)
       mode="fork-only"
       ;;
+    --client|-c)
+      mode="client"
+      ;;
     --help|-h)
-      echo "Usage: omz-customupdate [--fork-only]"
+      echo "Usage: omz-customupdate [--fork-only|--client]"
       echo ""
       echo "  --fork-only  Fetch origin and align local master/custom to origin without pushing."
-      echo "  default      Pull upstream/master into local master, rebase custom, and push origin/master + origin/custom."
+      echo "  --client     Read-only client sync: fetch origin and align local custom to origin/custom."
+      echo "  default      Upstream sync: update master from upstream, rebase custom, and push origin/master + origin/custom."
       return 0
       ;;
     "")
@@ -48,6 +53,38 @@ omz-customupdate() {
     return 1
   fi
 
+  if [[ "$mode" == "client" ]]; then
+    if ! git remote get-url origin >/dev/null 2>&1; then
+      echo "omz-customupdate: origin remote is not configured" >&2
+      return 1
+    fi
+
+    echo "[omz-customupdate] Fetching origin for read-only client sync..."
+    git fetch origin --prune || return 1
+
+    if git show-ref --verify --quiet refs/remotes/origin/master; then
+      echo "[omz-customupdate] Fast-forwarding master to origin/master..."
+      git checkout master || return 1
+      git merge --ff-only origin/master || return 1
+    else
+      echo "[omz-customupdate] origin/master not found; skipping master update."
+    fi
+
+    echo "[omz-customupdate] Resetting custom to origin/custom..."
+    git checkout custom || {
+      git checkout -B custom origin/custom || return 1
+      git checkout custom || return 1
+    }
+    git reset --hard origin/custom || return 1
+
+    if [[ "$original_branch" != "custom" ]]; then
+      git checkout "$original_branch" || return 1
+    fi
+
+    echo "[omz-customupdate] Done. This client host is synced to the fork's custom branch without pushing."
+    return 0
+  fi
+
   if [[ "$mode" == "fork-only" ]]; then
     if ! git remote get-url origin >/dev/null 2>&1; then
       echo "omz-customupdate: origin remote is not configured" >&2
@@ -72,7 +109,7 @@ omz-customupdate() {
       git checkout "$original_branch" || return 1
     fi
 
-    echo "[omz-customupdate] Done. local master/custom now match the fork." 
+    echo "[omz-customupdate] Done. local master/custom now match the fork."
     return 0
   fi
 
